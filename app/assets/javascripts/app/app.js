@@ -1,7 +1,12 @@
-angular.module("popcornApp", ["ngRoute", "popcornApp.controllers",
+angular.module("popcornApp", ["ngRoute", "ngCookies", "popcornApp.controllers",
                "popcornApp.services"])
   .config(function($routeProvider, $locationProvider){
     $routeProvider
+    .when("/login",
+      {
+        controller: "LoginController",
+        templateUrl: "/templates/login.html"
+      })
     .when("/movie/:movie_id",
       {
         controller: "MovieController",
