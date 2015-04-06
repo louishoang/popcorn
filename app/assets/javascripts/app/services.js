@@ -1,6 +1,6 @@
 angular.module("popcornApp.services", [])
 .service("MoviesService",
- function($http, $q){ // use http XHR services and require $q service
+ function($http, $q, Movie){ // use http XHR services and require $q service
   this.movies = function(name){
     // create a defer object
     var d = $q.defer();
@@ -27,6 +27,21 @@ angular.module("popcornApp.services", [])
         };
 
       });
+
+      // for each of the movie from youtube, create a record in database
+      var moviePromises = _.map(movies, function(movieData){
+        var youtubeId = movieData.youtubeId;
+        return Movie.findOrCreateByYoutubeId(youtubeId, movieData);
+      });
+
+      // findOrCreateByYoutubeId only return promises so we need to use $q.all to resolve
+      // each of them
+
+      $q.all(moviePromises).then(function(movieResources){
+        d.resolve(movieResources);
+      });
+
+
       // instead of return movies here, we need to resolve it because it's a promise
       // resolve if http success
       d.resolve(movies);
@@ -37,46 +52,46 @@ angular.module("popcornApp.services", [])
         d.reject(error);
     });
     return d.promise;
-  }
+  };
 })
-.service("UserService",
-  function($q, $cookieStore){ //$cookieStore store user in cookie so that we dont have to call service multiple time and user has a session
-  var service = this;
-  this._user = null;
+.service('UserService',
+   function($rootScope, $q, $cookieStore) {
+     var service = this;
+     this._user = null;
+     this.setCurrentUser = function(u) {
+       service._user = u;
+       $cookieStore.put('user', u);
+       $rootScope.$broadcast("user:set", u);
+     };
+     this.currentUser = function() {
+       var d = $q.defer();
+       if(service._user) {
+         d.resolve(service._user);
+       } else if($cookieStore.get('user')) {
+         service.setCurrentUser($cookieStore.get('user'));
+         d.resolve(service._user);
+       } else {
+         d.resolve(null);
+       }
+       return d.promise;
+     };
+     this.login = function(email) {
+       var d = $q.defer();
+       var user = {
+         email: email,
+         id: 1
+       };
 
-  this.login = function(email){
-    var d = $q.defer();
-    var user = {
-      email: email,
-      id: 1
-    };
-    service._user = user;
-    $cookieStore.put("user", user); // store user as a hash in cookie
-    d.resolve(user);
-    return d.promise;
-  }
-
-  this.logout = function(){
-    var d = q.defer();
-    service._user = null;
-    $cookieStore.remove("user"); // remove user cookie
-    d.resolve();
-    return d.promise;
-  }
-
-  this.currentUser = function(){
-    var d = $q.defer();
-
-    if(service._user){
-      d.resolve(service._user);
-    }else if($cookieStore.get('user')){ //check if user is in cookie
-      service._user = $cookieStore.get("user");
-      d.resolve(service._user);
-    } else{
-      d.resolve(null);
-    }
-
-    return d.promise;
-  }
-
-});
+       service.setCurrentUser(user);
+       d.resolve(user);
+       return d.promise;
+     };
+     this.logout = function() {
+       var d = $q.defer();
+       service._user = null;
+       $cookieStore.remove('user');
+       $rootScope.$broadcast("user:unset");
+       d.resolve();
+       return d.promise;
+     };
+  });
